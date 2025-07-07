@@ -3,13 +3,17 @@ using System.Threading.Tasks;
 
 class Program
 {
-public class Plan
-    // MIKE TODO: create an idea how we can create and export rdy plan to a file.
+public class PlannerLogic
+    // MIKE TODO: Create a class that will based on availbility of Formeren stations and Ready locations 
+    //decide which order slots can be assigned to which stations and locations.
     {
+
     }
+
 
  public static async Task SendMiroShapeAsync(string content, int x, int y, string fillColor)
     {
+        // Token have to be filled up ( temporary token for testing purposes)
         var options = new RestClientOptions("https://api.miro.com/v2/boards/uXjVIgiE9aY%3D/shapes");
         var client = new RestClient(options);
         var request = new RestRequest("");
@@ -28,12 +32,19 @@ public class Plan
     // Define a class to represent a Formeren station with an ID and available time.
     // This class will be used to create a list of Formeren stations.
     // This class contains properties for the station ID and the time available for formeren.
+    // Stack is beeing used to store orders added to the station, which can be later used for putting to RDY station.
     {
         public int FormerenStationID;
         public int TimeAvailableFormeren;
+        public int x;
+        public int y;
+        HashSet<int> TimeBusy = new HashSet<int>();
+        public Stack<(string OrderCategory, int x, int y, string Color)> OrdersAdded { get; }
+            = new Stack<(string, int, int, string)>();
+
     }
 
-public class CreatorFormerenStation
+    public class CreatorFormerenStation
     // Creates a list of formeren stations based on the user input. Every day in operation is slightly different,
     // so it is crucial to be able to create a list of stations dynamically.
     {
@@ -42,7 +53,7 @@ public class CreatorFormerenStation
             var stations = new List<FormerenStation>();
             for (int i = 1; i <= amount; i++)
             {
-                stations.Add(new FormerenStation { FormerenStationID = i, TimeAvailableFormeren = 1440 });
+                stations.Add(new FormerenStation { FormerenStationID = i, TimeAvailableFormeren = 1440, x = i*100, y=0 });
             }
             return stations;
         }
@@ -52,9 +63,15 @@ public class ReadyLocation
     // Define a class to represent a Formeren Ready Location with an ID (operation see it as a dock) and available time.
     // This class will be used to create a list of Formeren Ready locations.
     // This class contains properties for the location ID and the time available when order can be awaiting for pick-up.
+    // Stack is beeing used to store orders added to the Location, gets populated by FormerenStation.
     {
         public int ReadyLocationID;
         public int TimeAvailableReady;
+        public int x;
+        public int y;
+        HashSet<int> TimeBusy = new HashSet<int>();
+                public Stack<(string OrderCategory, int x, int y, string Color)> OrdersAdded { get; }
+            = new Stack<(string, int, int, string)>();
     }
 
 public class CreatorReadyLocation
@@ -66,7 +83,7 @@ public class CreatorReadyLocation
         var locations = new List<ReadyLocation>();
         for (int i = 1; i <= amount; i++)
         {
-            locations.Add(new ReadyLocation { ReadyLocationID = i, TimeAvailableReady = 1440 });
+            locations.Add(new ReadyLocation { ReadyLocationID = i, TimeAvailableReady = 1440, x = i * 100, y = 0 });
         }
         return locations;
     }
@@ -102,6 +119,8 @@ public class CreatorReadyLocation
     {
         public string Category { get; set; }
         public int Count { get; set; }
+        public int Duration { get; set; }
+        // 1 = shortest time needed, 3 = longest time needed.
     }
     static async Task Main(string[] args)
     {
@@ -110,21 +129,21 @@ public class CreatorReadyLocation
         int OrderSlotAmmount = 0;
         List<CategoryCount> Categories = new List<CategoryCount>
         {
-            new CategoryCount{ Category = "VE(A)", Count =0},
-            new CategoryCount{ Category = "VE(B)", Count =0},
-            new CategoryCount{ Category = "E(A)", Count =0},
-            new CategoryCount{ Category = "E(B)", Count =0},
-            new CategoryCount{ Category = "M(A)", Count =0},
-            new CategoryCount{ Category = "M(B)", Count =0},
-            new CategoryCount{ Category = "D(A)", Count =0},
-            new CategoryCount{ Category = "D(B)", Count =0},
-            new CategoryCount{ Category = "VD(A)", Count =0},
-            new CategoryCount{ Category = "VD(B)", Count =0},
-            new CategoryCount{ Category = "Container", Count =0},
-            new CategoryCount{ Category = "SE", Count =0},
-            new CategoryCount{ Category = "BE(A)", Count =0},
-            new CategoryCount{ Category = "BE(B)", Count =0},
-            new CategoryCount{ Category = "NL", Count =0},
+            new CategoryCount{ Category = "VE(A)", Count =0, Duration= 1},
+            new CategoryCount{ Category = "VE(B)", Count =0, Duration= 1},
+            new CategoryCount{ Category = "E(A)", Count =0, Duration= 2},
+            new CategoryCount{ Category = "E(B)", Count =0, Duration= 2},
+            new CategoryCount{ Category = "M(A)", Count =0, Duration= 2},
+            new CategoryCount{ Category = "M(B)", Count =0, Duration= 2},
+            new CategoryCount{ Category = "D(A)", Count =0, Duration= 2},
+            new CategoryCount{ Category = "D(B)", Count =0, Duration= 3},
+            new CategoryCount{ Category = "VD(A)", Count =0, Duration= 3},
+            new CategoryCount{ Category = "VD(B)", Count =0, Duration= 3},
+            new CategoryCount{ Category = "Container", Count =0, Duration= 2},
+            new CategoryCount{ Category = "SE", Count =0, Duration= 3 },
+            new CategoryCount{ Category = "BE(A)", Count =0, Duration= 2},
+            new CategoryCount{ Category = "BE(B)", Count =0 , Duration= 3},
+            new CategoryCount{ Category = "NL", Count =0, Duration= 3},
          };
 
         Console.WriteLine("Welcome to the Planner application!");
