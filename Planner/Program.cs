@@ -1,11 +1,30 @@
-﻿class Program
+﻿using RestSharp;
+using System.Threading.Tasks;
+
+class Program
 {
 public class Plan
     // MIKE TODO: create an idea how we can create and export rdy plan to a file.
     {
     }
 
-public class FormerenStation
+ public static async Task SendMiroShapeAsync(string content, int x, int y, string fillColor)
+    {
+        var options = new RestClientOptions("https://api.miro.com/v2/boards/uXjVIgiE9aY%3D/shapes");
+        var client = new RestClient(options);
+        var request = new RestRequest("");
+        request.AddHeader("accept", "application/json");
+        request.AddHeader("authorization", "Bearer eyJtaXJvLm9yaWdpbiI6ImV1MDEifQ_6uhsIkFTs8tltkazYN0mUr0KJ4M");
+
+        string body = $"{{\"data\":{{\"content\":\"{content}\",\"shape\":\"rectangle\"}},\"position\":{{\"x\":{x},\"y\":{y}}},\"geometry\":{{\"height\":60,\"width\":100}},\"style\":{{\"fillColor\":\"{fillColor}\"}}}}";
+        request.AddJsonBody(body, false);
+
+        var response = await client.PostAsync(request);
+
+        Console.WriteLine(response.Content);
+    }
+
+    public class FormerenStation
     // Define a class to represent a Formeren station with an ID and available time.
     // This class will be used to create a list of Formeren stations.
     // This class contains properties for the station ID and the time available for formeren.
@@ -84,7 +103,7 @@ public class CreatorReadyLocation
         public string Category { get; set; }
         public int Count { get; set; }
     }
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
         int FormerenStationAmmount = 0;
         int ReadyLocationAmmount = 0;
@@ -125,6 +144,13 @@ public class CreatorReadyLocation
         var formerenStations = CreatorFormerenStation.CreatorFormerenStations(FormerenStationAmmount);
         var readyLocation = CreatorReadyLocation.CreatorReadyLocations(ReadyLocationAmmount);
 
+
+        // Using RestSharp to make a POST request to the Miro API to create a shape on a board (booking)
+
+
+        await SendMiroShapeAsync("VE(A)", 0, 0, "#93d275");
+        await SendMiroShapeAsync("D(B)", 60, 100, "#d5f692");
+        await SendMiroShapeAsync("BE(B)", 120, 100, "#93d275");
 
         // Testing input section
         Console.WriteLine($"{FormerenStationAmmount}, {ReadyLocationAmmount},{OrderSlotAmmount} ");
