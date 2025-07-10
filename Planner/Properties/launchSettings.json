@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Planner": {
+      "commandName": "Project",
+      "remoteDebugEnabled": false,
+      "hotReloadEnabled": false
+    }
+  }
+}
