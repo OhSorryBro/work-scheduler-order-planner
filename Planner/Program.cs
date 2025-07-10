@@ -1,4 +1,5 @@
 ﻿using RestSharp;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using static Program;
 
@@ -14,12 +15,14 @@ class Program
                 .First();
         }
 
-                Dictionary<int, double[]> scenarioWeights = new()
+
+            Dictionary<int, double[]> scenarioWeights = new()
         {
             { 1, new double[] { 0.8, 0.15, 0.05 } },   // Scenario 1: 80%/15%/5%
             { 2, new double[] { 0.55, 0.30, 0.15 } }, // Scenario 2: 55%/30%/15%
             { 3, new double[] { 0.3, 0.35, 0.35 } } // Scenario 3: 33%/33%/34%
         };
+
         private int DrawGroupByScenario(int scenario, Random rng, Dictionary<int, double[]> scenarioWeights)
         {
             var weights = scenarioWeights[scenario];
@@ -105,6 +108,41 @@ class Program
             }
 
         }
+        public void CheckIfEnoughTimeAvailable(List<FormerenStation> formerenStations, List<CategoryCount> categories)
+        {
+            // This method checks if there is enough time available in the Formeren stations to process all orders.
+            // If not, it will tell user that he fu*ked up and there is not enough time to process all orders.
+            int totalTimeNeeded = categories.Sum(cat => cat.Count * cat.Duration);
+            int totalTimeAvailable = formerenStations.Sum(station => station.TimeAvailableFormeren);
+            if (totalTimeNeeded > totalTimeAvailable)
+            {
+                throw new InvalidOperationException($"Not enough time available in Formeren stations to process all orders. Orders need {totalTimeNeeded} minutes and it is greater than available: {totalTimeAvailable} minutes")
+                {
+
+                };
+            }
+        }
+    }
+
+    public static int ReadIntFromConsole(string prompt)
+    {
+        int result;
+        while (true)
+        {
+            Console.WriteLine(prompt);
+            string input = Console.ReadLine();
+            if (int.TryParse(input, out result))
+            {
+                if (result > 0)
+                    return result; // Sukces – zwracamy wynik
+                else
+                    Console.WriteLine("Please type in a valid number greater than 0.");
+            }
+            else
+            {
+                Console.WriteLine("Invalid format, only integer can be accepted.");
+            }
+        }
     }
 
     public static async Task SendMiroShapeAsync(string content, int x, int y, string fillColor, int height)
@@ -114,7 +152,7 @@ class Program
         var client = new RestClient(options);
         var request = new RestRequest("");
         request.AddHeader("accept", "application/json");
-        request.AddHeader("authorization", "Bearer eyJtaXJvLm9yaWdpbiI6ImV1MDEifQ_Rk85H1QZCIXNC7s_5KwI9z_L5F8");
+        request.AddHeader("authorization", "Bearer eyJtaXJvLm9yaWdpbiI6ImV1MDEifQ_fEQrYbeNK2-fBsKrCqrYnK3uC3Y");
 
         string body = $"{{\"data\":{{\"content\":\"{content}\",\"shape\":\"rectangle\"}},\"position\":{{\"x\":{x},\"y\":{y}}},\"geometry\":{{\"height\":{height},\"width\":100}},\"style\":{{\"fillColor\":\"{fillColor}\"}}}}";
         request.AddJsonBody(body, false);
@@ -196,8 +234,6 @@ public class CreatorReadyLocation
     }
     static async Task Main(string[] args)
     {
-        int FormerenStationAmmount = 0;
-        int ReadyLocationAmmount = 0;
         int OrderSlotAmmount = 0;
         List<CategoryCount> Categories = new List<CategoryCount>
         {
@@ -218,21 +254,22 @@ public class CreatorReadyLocation
             new CategoryCount{ Category = "NL",         Duration=270 ,  Count =0, DurationGroup= 3, Color = "#b384bb"},
          };
 
+
         // Welcome message and input section
         Console.WriteLine("Welcome to the Planner application!");
         Console.WriteLine("This application is designed to help you plan your work-load effectively at the Heijen department.");
         Console.WriteLine("It will assist you in determining the best order slots based on the available time at the Formeren station and Ready locations.");
-        Console.WriteLine("Please type in ammount of Formeren stations available:");
-        FormerenStationAmmount = Convert.ToInt16(Console.ReadLine());
-        Console.WriteLine("Please type in ammount of Ready locations available:");
-        ReadyLocationAmmount = Convert.ToInt16(Console.ReadLine());
-        Console.WriteLine("Choose the scenario (1, 2, 3):");
-        int scenario = int.Parse(Console.ReadLine());
+
+
+        int FormerenStationAmmount = ReadIntFromConsole("Please type in amount of Formeren stations available:");
+        int ReadyLocationAmmount = ReadIntFromConsole("Please type in amount of Ready locations available:");
+        int scenario = ReadIntFromConsole("Choose the scenario (1, 2, 3):");
+
+
         Random rng = new Random();
         foreach (var category in Categories)
         {
-            Console.WriteLine($"Please type in ammount of Order slots available for {category.Category}:");
-            category.Count = Convert.ToInt16(Console.ReadLine());
+            category.Count = ReadIntFromConsole($"Please type in ammount of Order slots available for {category.Category}:");
         }
 
 
@@ -243,45 +280,59 @@ public class CreatorReadyLocation
 
         // We are going to use PlannerLogic class to plan the orders based on the user input.
         PlannerLogic planner = new PlannerLogic();
-
-        while (Categories.Sum(cat => cat.Count) > 0)
+        try
         {
-            planner.Plan(formerenStations, Categories, scenario, rng);
-        }
+            // We check if user is not retarded and try to plan too many orders
 
-        Console.WriteLine("All orders have been given!");
-
-        // Using RestSharp to make a POST request to the Miro API to create a shape on a board(booking)
-        foreach (var station in formerenStations)
-        {
-            foreach (var order in station.OrdersAdded)
+            planner.CheckIfEnoughTimeAvailable(formerenStations, Categories);
+            while (Categories.Sum(cat => cat.Count) > 0)
             {
-                // We unpack the order tuple to get the category, x, y and color
-                string content = order.OrderCategory;
-                int x = order.x;
-                int y = order.y;
-                string fillColor = order.Color;
-                int duration = Categories.First(cat => cat.Category == order.OrderCategory).Duration;
-                int height = duration;
-                await SendMiroShapeAsync(content, x, y, fillColor, height);
-
+                planner.Plan(formerenStations, Categories, scenario, rng);
             }
+                Console.WriteLine("All orders have been given!");
+
+                // Using RestSharp to make a POST request to the Miro API to create a shape on a board(booking)
+                foreach (var station in formerenStations)
+                {
+                    foreach (var order in station.OrdersAdded)
+                    {
+                        // We unpack the order tuple to get the category, x, y and color
+                        string content = order.OrderCategory;
+                        int x = order.x;
+                        int y = order.y;
+                        string fillColor = order.Color;
+                        int duration = Categories.First(cat => cat.Category == order.OrderCategory).Duration;
+                        int height = duration;
+                        await SendMiroShapeAsync(content, x, y, fillColor, height);
+
+                    }
+                }
+
+                // Testing input section
+                Console.WriteLine($"{FormerenStationAmmount}, {ReadyLocationAmmount},{OrderSlotAmmount} ");
+                foreach (var category in Categories)
+                {
+                    Console.WriteLine($"{category.Category}: {category.Count}");
+                }
+                foreach (var station in formerenStations)
+                {
+                    Console.WriteLine($"FormerenStationID: {station.FormerenStationID}, TimeAvailableFormeren: {station.TimeAvailableFormeren}");
+                }
+                foreach (var location in readyLocation)
+                {
+                    Console.WriteLine($"ReadylocationID: {location.ReadyLocationID}, TimeAvailableReady: {location.TimeAvailableReady}");
+                }
+                Console.ReadLine();
+            
+        }
+        catch (InvalidOperationException ex)
+        {
+            {
+                Console.WriteLine("Error: " + ex.Message);
+                Console.ReadLine();
+            }
+
         }
 
-        // Testing input section
-        Console.WriteLine($"{FormerenStationAmmount}, {ReadyLocationAmmount},{OrderSlotAmmount} ");
-        foreach (var category in Categories)
-        {
-            Console.WriteLine($"{category.Category}: {category.Count}");
-        }
-        foreach (var station in formerenStations)
-        {
-            Console.WriteLine($"FormerenStationID: {station.FormerenStationID}, TimeAvailableFormeren: {station.TimeAvailableFormeren}");
-        }
-        foreach (var location in readyLocation)
-        {
-            Console.WriteLine($"ReadylocationID: {location.ReadyLocationID}, TimeAvailableReady: {location.TimeAvailableReady}");
-        }
-        Console.ReadLine();
     }
 }
