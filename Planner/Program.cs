@@ -1,4 +1,5 @@
 ﻿using RestSharp;
+using System.Globalization;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using static Program;
@@ -7,16 +8,21 @@ class Program
 {
     public class PlannerLogic
     {
-        // MIKE TODO: implement logic to implement 3 scenario options
         public static FormerenStation FindStationWithLowestMaxTimeBusy(List<FormerenStation> stations)
         {
             return stations
                 .OrderBy(station => station.TimeBusy.Count > 0 ? station.TimeBusy.Max() : 0)
                 .First();
         }
+        public static ReadyLocation FindReadyLocationWithLowestMaxTimeBusy(List<ReadyLocation> readyLocations)
+        {
+            return readyLocations
+                .OrderBy(location => location.TimeBusy.Count > 0 ? location.TimeBusy.Max() : 0)
+                .First();
+        }
 
 
-            Dictionary<int, double[]> scenarioWeights = new()
+        Dictionary<int, double[]> scenarioWeights = new()
         {
             { 1, new double[] { 0.8, 0.15, 0.05 } },   // Scenario 1: 80%/15%/5%
             { 2, new double[] { 0.55, 0.30, 0.15 } }, // Scenario 2: 55%/30%/15%
@@ -50,16 +56,13 @@ class Program
 
                         if (groupCategories.Count > 0)
                         {
-                            // Losowo z dostępnych
                             return groupCategories[rng.Next(groupCategories.Count)];
                         }
-                        // Jeśli nie ma już orderów w żadnej grupie:
                         if (!categories.Any(cat => cat.Count > 0))
                             return null;
-                        // Inaczej – losuj jeszcze raz
                     }
                 }
-        public void Plan(List<FormerenStation> formerenStations, List<CategoryCount> categories, int scenario, Random rng)
+        public void PlanToFormerenStation(List<FormerenStation> formerenStations, List<CategoryCount> categories, int scenario, Random rng)
         {
             var bestStation = FindStationWithLowestMaxTimeBusy(formerenStations);
             var firstAvailableCategory = PickOrderByScenario(categories, scenario, rng, scenarioWeights);
@@ -83,6 +86,8 @@ class Program
                     prevHeight = categories.FirstOrDefault(cat => cat.Category == prevOrder.OrderCategory)?.Duration ?? 0;
                 }
                 int margin = 1;
+                var orderStart = previousMax +1;
+                var orderEnd = orderStart + duration -1;
                 int newY = prevY + (prevHeight / 2) + (duration / 2) + margin;
 
                 // end of y parameter calculation
@@ -99,15 +104,76 @@ class Program
                 firstAvailableCategory.Category,
                 bestStation.x,
                 newY,
-                firstAvailableCategory.Color
+                firstAvailableCategory.Color,
+                orderStart,
+                orderEnd
                 ));
             }
             else
             {
                 Console.WriteLine("Seems like we are done here.");
             }
-
+        
         }
+
+        private static bool IsSlotAvailable(HashSet<int> timeBusy, int orderStart, int orderEnd)
+        {
+            for (int minute = orderStart; minute < orderEnd; minute++)
+                if (timeBusy.Contains(minute))
+                    return false;
+            return true;
+        }
+
+        private static void MarkSlotBusy(HashSet<int> timeBusy, int orderStart, int orderEnd)
+        {
+            for (int minute = orderStart; minute < orderEnd; minute++)
+                timeBusy.Add(minute);
+        }
+        public static void TransferOrdersToReadyLocations(List<FormerenStation> formerenStations, List<ReadyLocation> readyLocations, List<CategoryCount> categories)
+        {
+            var station = formerenStations.FirstOrDefault(s => s.OrdersAdded.Count > 0);
+            if (station == null) return; // Wszystko przeniesione
+
+            // Zdejmujemy JEDEN order z góry stacka (ostatnio dodany)
+            var order = station.OrdersAdded.Pop();
+            int duration = categories.First(cat => cat.Category == order.OrderCategory).Duration;
+
+            // Szukamy docka, który ma cały slot wolny
+            ReadyLocation ready = null;
+            int orderStart = order.orderStart;
+            int orderEnd = order.orderEnd;
+            foreach (var loc in readyLocations.OrderBy(_ => Guid.NewGuid()))
+            {
+                if (IsSlotAvailable(loc.TimeBusy, orderStart, orderEnd))
+                {
+                    ready = loc;
+                    break;
+                }
+            }
+            if (ready == null)
+            {
+                // Brak wolnego docka – możesz tu wywołać exception, logikę restartu itd.
+                Console.WriteLine("Brak wolnego docka na ten slot! (TODO: obsługa tego przypadku)");
+                return;
+            }
+
+            // Wylicz x
+            int x = (20 + ready.ReadyLocationID) * 100;
+
+            // Oznacz slot jako zajęty!
+            MarkSlotBusy(ready.TimeBusy, orderStart, orderEnd);
+
+            // Przenosimy order (z nowym x)
+            ready.OrdersAdded.Push((
+                order.OrderCategory,
+                x,
+                order.y,
+                order.Color,
+                orderStart,
+                orderEnd
+            ));
+        }
+
         public void CheckIfEnoughTimeAvailable(List<FormerenStation> formerenStations, List<CategoryCount> categories)
         {
             // This method checks if there is enough time available in the Formeren stations to process all orders.
@@ -133,7 +199,7 @@ class Program
             string input = Console.ReadLine();
             if (int.TryParse(input, out result))
             {
-                if (result > 0)
+                if (result > -1)
                     return result; // Sukces – zwracamy wynik
                 else
                     Console.WriteLine("Please type in a valid number greater than 0.");
@@ -152,7 +218,7 @@ class Program
         var client = new RestClient(options);
         var request = new RestRequest("");
         request.AddHeader("accept", "application/json");
-        request.AddHeader("authorization", "Bearer eyJtaXJvLm9yaWdpbiI6ImV1MDEifQ_fEQrYbeNK2-fBsKrCqrYnK3uC3Y");
+        request.AddHeader("authorization", "Bearer eyJtaXJvLm9yaWdpbiI6ImV1MDEifQ_9FnwMHJnrZXzGHHUF2f6cggr4Gk");
 
         string body = $"{{\"data\":{{\"content\":\"{content}\",\"shape\":\"rectangle\"}},\"position\":{{\"x\":{x},\"y\":{y}}},\"geometry\":{{\"height\":{height},\"width\":100}},\"style\":{{\"fillColor\":\"{fillColor}\"}}}}";
         request.AddJsonBody(body, false);
@@ -172,9 +238,11 @@ class Program
         public int TimeAvailableFormeren;
         public int x;
         public int y;
+        public int orderStart;
+        public int orderEnd;
         public HashSet<int> TimeBusy { get; set; } = new HashSet<int>();
-        public Stack<(string OrderCategory, int x, int y, string Color)> OrdersAdded { get; }
-            = new Stack<(string, int, int, string)>();
+        public Stack<(string OrderCategory, int x, int y, string Color, int orderStart, int orderEnd)> OrdersAdded { get; }
+            = new Stack<(string, int, int, string, int orderStart, int orderEnd)>();
 
     }
 
@@ -203,9 +271,11 @@ public class ReadyLocation
         public int TimeAvailableReady;
         public int x;
         public int y;
-        HashSet<int> TimeBusy { get; set; } = new HashSet<int>();
-                public Stack<(string OrderCategory, int x, int y, string Color)> OrdersAdded { get; }
-            = new Stack<(string, int, int, string)>();
+        public int orderStart;
+        public int orderEnd;
+        public HashSet<int> TimeBusy { get; set; } = new HashSet<int>();
+                public Stack<(string OrderCategory, int x, int y, string Color,int orderStart, int orderEnd)> OrdersAdded { get; }
+            = new Stack<(string, int, int, string, int orderStart, int orderEnd)>();
     }
 
 public class CreatorReadyLocation
@@ -280,50 +350,144 @@ public class CreatorReadyLocation
 
         // We are going to use PlannerLogic class to plan the orders based on the user input.
         PlannerLogic planner = new PlannerLogic();
+        //try
+        //{
+        //    // We check if user is not retarded and try to plan too many orders
+
+        //    planner.CheckIfEnoughTimeAvailable(formerenStations, Categories);
+        //    while (Categories.Sum(cat => cat.Count) > 0)
+        //    {
+        //        planner.PlanToFormerenStation(formerenStations, Categories, scenario, rng);
+        //    }
+        //        Console.WriteLine("All orders have been given!");
+        //    foreach (var station in formerenStations)
+        //    {
+        //        foreach (var order in station.OrdersAdded)
+        //        {
+        //            // We unpack the order tuple to get the category, x, y and color
+        //            string content = order.OrderCategory;
+        //            int x = order.x;
+        //            int y = order.y;
+        //            string fillColor = order.Color;
+        //            int duration = Categories.First(cat => cat.Category == order.OrderCategory).Duration;
+        //            int height = duration;
+        //            await SendMiroShapeAsync(content, x, y, fillColor, height);
+
+        //        }
+        //    }
+
+
+        //    // Using RestSharp to make a POST request to the Miro API to create a shape on a board(booking)
+        //    foreach (var station in formerenStations)
+        //        {
+        //            foreach (var order in station.OrdersAdded)
+        //            {
+        //                // We unpack the order tuple to get the category, x, y and color
+        //                string content = order.OrderCategory;
+        //                int x = order.x;
+        //                int y = order.y;
+        //                string fillColor = order.Color;
+        //                int duration = Categories.First(cat => cat.Category == order.OrderCategory).Duration;
+        //                int height = duration;
+        //                await SendMiroShapeAsync(content, x, y, fillColor, height);
+
+        //            }
+        //        }
+
+        //        // Testing input section
+        //        Console.WriteLine($"{FormerenStationAmmount}, {ReadyLocationAmmount},{OrderSlotAmmount} ");
+        //        foreach (var category in Categories)
+        //        {
+        //            Console.WriteLine($"{category.Category}: {category.Count}");
+        //        }
+        //        foreach (var station in formerenStations)
+        //        {
+        //            Console.WriteLine($"FormerenStationID: {station.FormerenStationID}, TimeAvailableFormeren: {station.TimeAvailableFormeren}");
+        //        }
+        //        foreach (var location in readyLocation)
+        //        {
+        //            Console.WriteLine($"ReadylocationID: {location.ReadyLocationID}, TimeAvailableReady: {location.TimeAvailableReady}");
+        //        }
+        //        Console.ReadLine();
+            
+        //}
+        //catch (InvalidOperationException ex)
+        //{
+        //    {
+        //        Console.WriteLine("Error: " + ex.Message);
+        //        Console.ReadLine();
+        //    }
+
+        //}
+
+
         try
         {
             // We check if user is not retarded and try to plan too many orders
-
             planner.CheckIfEnoughTimeAvailable(formerenStations, Categories);
             while (Categories.Sum(cat => cat.Count) > 0)
             {
-                planner.Plan(formerenStations, Categories, scenario, rng);
+                planner.PlanToFormerenStation(formerenStations, Categories, scenario, rng);
             }
-                Console.WriteLine("All orders have been given!");
+            Console.WriteLine("All orders have been given!");
 
-                // Using RestSharp to make a POST request to the Miro API to create a shape on a board(booking)
-                foreach (var station in formerenStations)
-                {
-                    foreach (var order in station.OrdersAdded)
-                    {
-                        // We unpack the order tuple to get the category, x, y and color
-                        string content = order.OrderCategory;
-                        int x = order.x;
-                        int y = order.y;
-                        string fillColor = order.Color;
-                        int duration = Categories.First(cat => cat.Category == order.OrderCategory).Duration;
-                        int height = duration;
-                        await SendMiroShapeAsync(content, x, y, fillColor, height);
+            while (!formerenStations.All(station => station.OrdersAdded.Count == 0))
+            {
+                PlannerLogic.TransferOrdersToReadyLocations(formerenStations, readyLocation, Categories);
+            }
+            Console.WriteLine("All orders have been moved!");
 
-                    }
-                }
+            foreach (var location in readyLocation)
+            {
+                foreach (var order in location.OrdersAdded)
+                {
+                    // We unpack the order tuple to get the category, x, y and color
+                    string content = order.OrderCategory;
+                    int x = order.x;
+                    int y = order.y;
+                    string fillColor = order.Color;
+                    int duration = Categories.First(cat => cat.Category == order.OrderCategory).Duration;
+                    int height = duration;
+                    await SendMiroShapeAsync(content, x, y, fillColor, height);
 
-                // Testing input section
-                Console.WriteLine($"{FormerenStationAmmount}, {ReadyLocationAmmount},{OrderSlotAmmount} ");
-                foreach (var category in Categories)
-                {
-                    Console.WriteLine($"{category.Category}: {category.Count}");
                 }
-                foreach (var station in formerenStations)
-                {
-                    Console.WriteLine($"FormerenStationID: {station.FormerenStationID}, TimeAvailableFormeren: {station.TimeAvailableFormeren}");
-                }
-                foreach (var location in readyLocation)
-                {
-                    Console.WriteLine($"ReadylocationID: {location.ReadyLocationID}, TimeAvailableReady: {location.TimeAvailableReady}");
-                }
-                Console.ReadLine();
-            
+            }
+
+
+
+            // Using RestSharp to make a POST request to the Miro API to create a shape on a board(booking)
+            //foreach (var location in readyLocation)
+            //{
+            //    foreach (var order in location.OrdersAdded)
+            //    {
+            //        // We unpack the order tuple to get the category, x, y and color
+            //        string content = order.OrderCategory;
+            //        int x = order.x;
+            //        int y = order.y;
+            //        string fillColor = order.Color;
+            //        int duration = Categories.First(cat => cat.Category == order.OrderCategory).Duration;
+            //        int height = duration;
+            //        await SendMiroShapeAsync(content, x, y, fillColor, height);
+
+            //    }
+            //}
+
+            // Testing input section
+            Console.WriteLine($"{FormerenStationAmmount}, {ReadyLocationAmmount},{OrderSlotAmmount} ");
+            foreach (var category in Categories)
+            {
+                Console.WriteLine($"{category.Category}: {category.Count}");
+            }
+            foreach (var station in formerenStations)
+            {
+                Console.WriteLine($"FormerenStationID: {station.FormerenStationID}, TimeAvailableFormeren: {station.TimeAvailableFormeren}");
+            }
+            foreach (var location in readyLocation)
+            {
+                Console.WriteLine($"ReadylocationID: {location.ReadyLocationID}, TimeAvailableReady: {location.TimeAvailableReady}");
+            }
+            Console.ReadLine();
+
         }
         catch (InvalidOperationException ex)
         {
@@ -334,5 +498,13 @@ public class CreatorReadyLocation
 
         }
 
+
+
     }
 }
+
+
+
+
+
+
