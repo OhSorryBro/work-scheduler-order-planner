@@ -3,9 +3,15 @@ using System.Globalization;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using static Program;
+using static Program.PlannerLogic;
 
 class Program
 {
+
+    const string Author = "|| Made by: Michal Domagala";
+    const string Contact = "  || Visit my LinkedIn profile: https://www.linkedin.com/in/michal-domagala-b0147b236/";
+    const string Version = "|| Version: 1.13";
+
     public class PlannerLogic
     {
         public static FormerenStation FindStationWithLowestMaxTimeBusy(List<FormerenStation> stations)
@@ -62,6 +68,17 @@ class Program
                             return null;
                     }
                 }
+        public class OrderInfo
+        {
+            public string Category { get; set; }
+            public int X { get; set; }
+            public int Y { get; set; }
+            public string Color { get; set; }
+            public int Start { get; set; }
+            public int End { get; set; }
+        }
+        public List<OrderInfo> OrdersMovedFromTheStationList { get; } = new List<OrderInfo>();
+
         public void PlanToFormerenStation(List<FormerenStation> formerenStations, List<CategoryCount> categories, int scenario, Random rng)
         {
             var bestStation = FindStationWithLowestMaxTimeBusy(formerenStations);
@@ -108,6 +125,15 @@ class Program
                 orderStart,
                 orderEnd
                 ));
+                OrdersMovedFromTheStationList.Add(new OrderInfo
+                {
+                    Category = firstAvailableCategory.Category,
+                    X = bestStation.x,
+                    Y = newY,
+                    Color = firstAvailableCategory.Color,
+                    Start = orderStart,
+                    End = orderEnd
+                });
             }
             else
             {
@@ -348,78 +374,8 @@ public class CreatorReadyLocation
 
 
 
-        // We are going to use PlannerLogic class to plan the orders based on the user input.
-        PlannerLogic planner = new PlannerLogic();
-        //try
-        //{
-        //    // We check if user is not retarded and try to plan too many orders
-
-        //    planner.CheckIfEnoughTimeAvailable(formerenStations, Categories);
-        //    while (Categories.Sum(cat => cat.Count) > 0)
-        //    {
-        //        planner.PlanToFormerenStation(formerenStations, Categories, scenario, rng);
-        //    }
-        //        Console.WriteLine("All orders have been given!");
-        //    foreach (var station in formerenStations)
-        //    {
-        //        foreach (var order in station.OrdersAdded)
-        //        {
-        //            // We unpack the order tuple to get the category, x, y and color
-        //            string content = order.OrderCategory;
-        //            int x = order.x;
-        //            int y = order.y;
-        //            string fillColor = order.Color;
-        //            int duration = Categories.First(cat => cat.Category == order.OrderCategory).Duration;
-        //            int height = duration;
-        //            await SendMiroShapeAsync(content, x, y, fillColor, height);
-
-        //        }
-        //    }
-
-
-        //    // Using RestSharp to make a POST request to the Miro API to create a shape on a board(booking)
-        //    foreach (var station in formerenStations)
-        //        {
-        //            foreach (var order in station.OrdersAdded)
-        //            {
-        //                // We unpack the order tuple to get the category, x, y and color
-        //                string content = order.OrderCategory;
-        //                int x = order.x;
-        //                int y = order.y;
-        //                string fillColor = order.Color;
-        //                int duration = Categories.First(cat => cat.Category == order.OrderCategory).Duration;
-        //                int height = duration;
-        //                await SendMiroShapeAsync(content, x, y, fillColor, height);
-
-        //            }
-        //        }
-
-        //        // Testing input section
-        //        Console.WriteLine($"{FormerenStationAmmount}, {ReadyLocationAmmount},{OrderSlotAmmount} ");
-        //        foreach (var category in Categories)
-        //        {
-        //            Console.WriteLine($"{category.Category}: {category.Count}");
-        //        }
-        //        foreach (var station in formerenStations)
-        //        {
-        //            Console.WriteLine($"FormerenStationID: {station.FormerenStationID}, TimeAvailableFormeren: {station.TimeAvailableFormeren}");
-        //        }
-        //        foreach (var location in readyLocation)
-        //        {
-        //            Console.WriteLine($"ReadylocationID: {location.ReadyLocationID}, TimeAvailableReady: {location.TimeAvailableReady}");
-        //        }
-        //        Console.ReadLine();
-            
-        //}
-        //catch (InvalidOperationException ex)
-        //{
-        //    {
-        //        Console.WriteLine("Error: " + ex.Message);
-        //        Console.ReadLine();
-        //    }
-
-        //}
-
+    // We are going to use PlannerLogic class to plan the orders based on the user input.
+    PlannerLogic planner = new PlannerLogic();
 
         try
         {
@@ -455,22 +411,26 @@ public class CreatorReadyLocation
 
 
 
-            // Using RestSharp to make a POST request to the Miro API to create a shape on a board(booking)
-            //foreach (var location in readyLocation)
-            //{
-            //    foreach (var order in location.OrdersAdded)
-            //    {
-            //        // We unpack the order tuple to get the category, x, y and color
-            //        string content = order.OrderCategory;
-            //        int x = order.x;
-            //        int y = order.y;
-            //        string fillColor = order.Color;
-            //        int duration = Categories.First(cat => cat.Category == order.OrderCategory).Duration;
-            //        int height = duration;
-            //        await SendMiroShapeAsync(content, x, y, fillColor, height);
+            foreach (var order in planner.OrdersMovedFromTheStationList)
+            {
+                await SendMiroShapeAsync(
+                    order.Category,
+                    order.X,
+                    order.Y,
+                    order.Color,
+                    order.End - order.Start
+                );
+            }
+            planner.OrdersMovedFromTheStationList.Clear();
 
-            //    }
-            //}
+            string authorNote = $"{Author} {Contact} {Version}";
+            await SendMiroShapeAsync(
+                authorNote,
+                -240, 
+                0,
+                "#FFFFFF",
+                320
+            );
 
             // Testing input section
             Console.WriteLine($"{FormerenStationAmmount}, {ReadyLocationAmmount},{OrderSlotAmmount} ");
