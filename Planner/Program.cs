@@ -1,6 +1,8 @@
 ﻿using RestSharp;
 using System.Globalization;
 using System.Linq.Expressions;
+using System.Reflection.Emit;
+using System.Reflection.PortableExecutable;
 using System.Threading.Tasks;
 using static Program;
 using static Program.PlannerLogic;
@@ -10,7 +12,9 @@ class Program
 
     const string Author = "|| Made by: Michal Domagala";
     const string Contact = "  || Visit my LinkedIn profile: https://www.linkedin.com/in/michal-domagala-b0147b236/";
-    const string Version = "|| Version: 1.14";
+    const string Version = "|| Version: 1.15";
+    const string TotalTries = $"|| Total tries: ";
+    const string LevelOfSevernity2 = "|| Level of Severnity: ";
 
     public class PlannerLogic
     {
@@ -28,12 +32,65 @@ class Program
         }
 
 
-        Dictionary<int, double[]> scenarioWeights = new()
+        public class LevelOfMatching
+        {
+            public Dictionary<int, double[]> ScenarioWeights { get; set; }
+            public int ScenarioUsed { get; set; }
+            public int TotalTries { get; set; }
+            public int LevelOfSevernity { get; set; }
+            public int OrdersMatched { get; set; }
+            public int OrdersUnmatched { get; set; }
+
+            public LevelOfMatching(int scenario)
+            {
+                ScenarioWeights = new Dictionary<int, double[]>
         {
             { 1, new double[] { 0.8, 0.15, 0.05 } },   // Scenario 1: 80%/15%/5%
-            { 2, new double[] { 0.55, 0.30, 0.15 } }, // Scenario 2: 55%/30%/15%
-            { 3, new double[] { 0.3, 0.35, 0.35 } } // Scenario 3: 33%/33%/34%
+            { 2, new double[] { 0.55, 0.30, 0.15 } },  // Scenario 2: 55%/30%/15%
+            { 3, new double[] { 0.3, 0.35, 0.35 } }    // Scenario 3: 33%/33%/34%
         };
+                ScenarioUsed = scenario;
+                TotalTries = 0;
+                LevelOfSevernity = 4;
+                OrdersMatched = 0;
+                OrdersUnmatched = 0;
+            }
+
+            public void IncrementTries()
+            {
+                TotalTries++;
+            }
+
+            public void UpdateSevernity(int newLevel)
+            {
+                LevelOfSevernity = newLevel;
+            }
+
+            // Przykładowa metoda oceny
+            public void EvaluateMatching(/* params możesz dodać listę orderów, statusy itd. */)
+            {
+                // Tutaj zrób logikę oceny dopasowania, np. na podstawie OrdersMatched, OrdersUnmatched
+                // i ustaw LevelOfSevernity odpowiednio (1/2/3)
+            }
+        }
+        public static int GetLoadingTimeBySeverity(int levelOfSevernity)
+        {
+            switch (levelOfSevernity)
+            {
+                case 1:
+                    return 90;
+                case 2:
+                    return 90;
+                case 3:
+                    return 80;
+                case 4:
+                    return 70;
+                default:
+                    return 90; // domyślnie, jeśli coś pójdzie nie tak
+            }
+        }
+
+
 
         private int DrawGroupByScenario(int scenario, Random rng, Dictionary<int, double[]> scenarioWeights)
         {
@@ -79,18 +136,34 @@ class Program
         }
         public List<OrderInfo> OrdersMovedFromTheStationList { get; } = new List<OrderInfo>();
 
-        public void PlanToFormerenStation(List<FormerenStation> formerenStations, List<CategoryCount> categories, int scenario, Random rng)
+        public void PlanToFormerenStation(List<FormerenStation> formerenStations,
+                                            List<CategoryCount> categories,
+                                            int scenario,
+                                            Random rng,
+                                            Dictionary<int, double[]> scenarioWeights)
         {
             var bestStation = FindStationWithLowestMaxTimeBusy(formerenStations);
+            var matching = new LevelOfMatching(scenario);
             var firstAvailableCategory = PickOrderByScenario(categories, scenario, rng, scenarioWeights);
-
+            
 
             if (firstAvailableCategory != null)
             {
+                int duration = firstAvailableCategory.Duration;
+                bool canPlace = formerenStations.Any(station =>
+                                                IsSlotAvailable(station.TimeBusy,
+                                                (station.TimeBusy.Count > 0 ? station.TimeBusy.Max() + 1 : 1),
+                                                (station.TimeBusy.Count > 0 ? station.TimeBusy.Max() + 1 : 1) + duration - 1)
+                                                );
+                if (!canPlace)
+                {
+                    throw new InvalidOperationException(
+                    $"No available worker slot for category {firstAvailableCategory.Category}, duration {duration} – try again!"
+                    );
+                    }
                 // We take order for further processing
                 Console.WriteLine($"Working with category: {firstAvailableCategory.Category}, We still have: {firstAvailableCategory.Count - 1}");
                 int previousMax = bestStation.TimeBusy.Count > 0 ? bestStation.TimeBusy.Max() : 0;
-                int duration = firstAvailableCategory.Duration;
                 int prevY = 1; // We set up prevY to 1, just in case if order is 1st.
 
                 // We assume that heigh of last order = Duration last category order
@@ -137,7 +210,7 @@ class Program
             }
             else
             {
-                Console.WriteLine("Seems like we are done here.");
+                Console.WriteLine("No more orders to process in this scenario.");
             }
         
         }
@@ -155,7 +228,7 @@ class Program
             for (int minute = orderStart; minute < orderEnd; minute++)
                 timeBusy.Add(minute);
         }
-        public static void TransferOrdersToReadyLocations(List<FormerenStation> formerenStations, List<ReadyLocation> readyLocations, List<CategoryCount> categories)
+        public static void TransferOrdersToReadyLocations(List<FormerenStation> formerenStations, List<ReadyLocation> readyLocations, List<CategoryCount> categories, int levelOfSevernity)
         {
             var station = formerenStations.FirstOrDefault(s => s.OrdersAdded.Count > 0);
             if (station == null) return; // Wszystko przeniesione
@@ -168,9 +241,13 @@ class Program
             ReadyLocation ready = null;
             int orderStart = order.orderStart;
             int orderEnd = order.orderEnd;
+            int loadingDuration = GetLoadingTimeBySeverity(levelOfSevernity);
+            int loadingStart = orderEnd + 1;         // zaczyna się bezpośrednio po zamówieniu
+            int loadingEnd = loadingStart + loadingDuration - 1;  
             foreach (var loc in readyLocations.OrderBy(_ => Guid.NewGuid()))
             {
-                if (IsSlotAvailable(loc.TimeBusy, orderStart, orderEnd))
+                // Tu sprawdzamy cały zakres: orderStart ... loadingEnd
+                if (IsSlotAvailable(loc.TimeBusy, orderStart, loadingEnd))
                 {
                     ready = loc;
                     break;
@@ -179,9 +256,9 @@ class Program
             if (ready == null)
             {
                 // Brak wolnego docka – możesz tu wywołać exception, logikę restartu itd.
-                Console.WriteLine("Brak wolnego docka na ten slot! (TODO: obsługa tego przypadku)");
-                return;
+                throw new InvalidOperationException("No empty place for this slot!");
             }
+
 
             // Wylicz x
             int x = (20 + ready.ReadyLocationID) * 100;
@@ -198,6 +275,20 @@ class Program
                 orderStart,
                 orderEnd
             ));
+            int loadingY = order.y + duration / 2 + loadingDuration / 2 + 1; // nowy y na bazie poprzedniego y (propozycja, możesz dopracować)
+
+            ready.OrdersAdded.Push((
+                "Loading time", // Category
+                x,              // x taki sam
+                loadingY,       // y przesunięte względem zamówienia
+                "#000000",      // np. szary
+                loadingStart,
+                loadingEnd
+            ));
+
+            // Uzupełniamy busy dla loadingu (żeby nie zająć slotu w tym czasie)
+            MarkSlotBusy(ready.TimeBusy, loadingStart, loadingEnd);
+
         }
 
         public void CheckIfEnoughTimeAvailable(List<FormerenStation> formerenStations, List<CategoryCount> categories)
@@ -216,6 +307,48 @@ class Program
         }
     }
 
+    public static List<CategoryCount> DeepCopyCategories(List<CategoryCount> source)
+    {
+        return source.Select(cat => new CategoryCount
+        {
+            Category = cat.Category,
+            Duration = cat.Duration,
+            Count = cat.Count,
+            DurationGroup = cat.DurationGroup,
+            Color = cat.Color
+        }).ToList();
+    }
+
+    public static List<FormerenStation> DeepCopyFormerenStations(List<FormerenStation> source)
+    {
+        return source.Select(st => new FormerenStation
+        {
+            FormerenStationID = st.FormerenStationID,
+            TimeAvailableFormeren = st.TimeAvailableFormeren,
+            x = st.x,
+            y = st.y,
+            orderStart = st.orderStart,
+            orderEnd = st.orderEnd,
+            TimeBusy = new HashSet<int>(st.TimeBusy),
+            OrdersAdded = new Stack<(string, int, int, string, int, int)>(st.OrdersAdded.Reverse())
+        }).ToList();
+    }
+
+    public static List<ReadyLocation> DeepCopyReadyLocations(List<ReadyLocation> source)
+    {
+        return source.Select(loc => new ReadyLocation
+        {
+            ReadyLocationID = loc.ReadyLocationID,
+            TimeAvailableReady = loc.TimeAvailableReady,
+            x = loc.x,
+            y = loc.y,
+            orderStart = loc.orderStart,
+            orderEnd = loc.orderEnd,
+            TimeBusy = new HashSet<int>(loc.TimeBusy),
+            OrdersAdded = new Stack<(string, int, int, string, int, int)>(loc.OrdersAdded.Reverse())
+        }).ToList();
+    }
+
     public static int ReadIntFromConsole(string prompt)
     {
         int result;
@@ -226,6 +359,26 @@ class Program
             if (int.TryParse(input, out result))
             {
                 if (result > -1)
+                    return result; // Sukces – zwracamy wynik
+                else
+                    Console.WriteLine("Please type in a valid number greater than 0.");
+            }
+            else
+            {
+                Console.WriteLine("Invalid format, only integer can be accepted.");
+            }
+        }
+    }
+    public static int ReadIntFromConsoleScenario(string prompt)
+    {
+        int result;
+        while (true)
+        {
+            Console.WriteLine(prompt);
+            string input = Console.ReadLine();
+            if (int.TryParse(input, out result))
+            {
+                if (result > 0 && result < 4)
                     return result; // Sukces – zwracamy wynik
                 else
                     Console.WriteLine("Please type in a valid number greater than 0.");
@@ -267,7 +420,7 @@ class Program
         public int orderStart;
         public int orderEnd;
         public HashSet<int> TimeBusy { get; set; } = new HashSet<int>();
-        public Stack<(string OrderCategory, int x, int y, string Color, int orderStart, int orderEnd)> OrdersAdded { get; }
+        public Stack<(string OrderCategory, int x, int y, string Color, int orderStart, int orderEnd)> OrdersAdded { get; set; }
             = new Stack<(string, int, int, string, int orderStart, int orderEnd)>();
 
     }
@@ -300,7 +453,7 @@ public class ReadyLocation
         public int orderStart;
         public int orderEnd;
         public HashSet<int> TimeBusy { get; set; } = new HashSet<int>();
-                public Stack<(string OrderCategory, int x, int y, string Color,int orderStart, int orderEnd)> OrdersAdded { get; }
+                public Stack<(string OrderCategory, int x, int y, string Color,int orderStart, int orderEnd)> OrdersAdded { get; set; }
             = new Stack<(string, int, int, string, int orderStart, int orderEnd)>();
     }
 
@@ -359,7 +512,7 @@ public class CreatorReadyLocation
 
         int FormerenStationAmmount = ReadIntFromConsole("Please type in amount of Formeren stations available:");
         int ReadyLocationAmmount = ReadIntFromConsole("Please type in amount of Ready locations available:");
-        int scenario = ReadIntFromConsole("Choose the scenario (1, 2, 3):");
+        int scenario = ReadIntFromConsoleScenario("Choose the scenario (1, 2, 3):");
 
 
         Random rng = new Random();
@@ -368,28 +521,43 @@ public class CreatorReadyLocation
             category.Count = ReadIntFromConsole($"Please type in ammount of Order slots available for {category.Category}:");
         }
 
-
         var formerenStations = CreatorFormerenStation.CreatorFormerenStations(FormerenStationAmmount);
         var readyLocation = CreatorReadyLocation.CreatorReadyLocations(ReadyLocationAmmount);
+        var matching = new LevelOfMatching(scenario);
+        bool success = false;
+        int maxTries = 300;
+        int tries = 0;
+        var levelOfMatching = new LevelOfMatching(scenario); // Przekazujesz numer scenariusza
 
 
+        // We are going to use PlannerLogic class to plan the orders based on the user input.
+        PlannerLogic planner = new PlannerLogic();
 
-    // We are going to use PlannerLogic class to plan the orders based on the user input.
-    PlannerLogic planner = new PlannerLogic();
+        var OriginalCategories = DeepCopyCategories(Categories);
+        var OriginalFormerenStations = CreatorFormerenStation.CreatorFormerenStations(FormerenStationAmmount);
+        var OriginalReadyLocation = CreatorReadyLocation.CreatorReadyLocations(ReadyLocationAmmount);
 
-        try
+        while (!success && tries < maxTries)
+        {
+            tries++;
+            var tmpCategories = DeepCopyCategories(OriginalCategories);
+            var tmpFormerenStations = DeepCopyFormerenStations(OriginalFormerenStations);
+            var tmpReadyLocation = DeepCopyReadyLocations(OriginalReadyLocation);
+            // Przygotuj "czyste" kopie danych do tej próby
+
+            try
         {
             // We check if user is not retarded and try to plan too many orders
-            planner.CheckIfEnoughTimeAvailable(formerenStations, Categories);
-            while (Categories.Sum(cat => cat.Count) > 0)
+            planner.CheckIfEnoughTimeAvailable(tmpFormerenStations, tmpCategories);
+            while (tmpCategories.Sum(cat => cat.Count) > 0)
             {
-                planner.PlanToFormerenStation(formerenStations, Categories, scenario, rng);
+                    planner.PlanToFormerenStation(tmpFormerenStations, tmpCategories, scenario, rng, matching.ScenarioWeights);
             }
             Console.WriteLine("All orders have been given!");
 
-            while (!formerenStations.All(station => station.OrdersAdded.Count == 0))
+            while (!tmpFormerenStations.All(station => station.OrdersAdded.Count == 0))
             {
-                PlannerLogic.TransferOrdersToReadyLocations(formerenStations, readyLocation, Categories);
+                    PlannerLogic.TransferOrdersToReadyLocations(tmpFormerenStations, tmpReadyLocation, tmpCategories, matching.LevelOfSevernity);
             }
             Console.WriteLine("All orders have been moved!");
 
@@ -405,19 +573,23 @@ public class CreatorReadyLocation
                 );
             }
 
-            foreach (var location in readyLocation)
+            foreach (var location in tmpReadyLocation)
             {
                 foreach (var order in location.OrdersAdded)
                 {
-                    // We unpack the order tuple to get the category, x, y and color
                     string content = order.OrderCategory;
                     int x = order.x;
                     int y = order.y;
                     string fillColor = order.Color;
-                    int duration = Categories.First(cat => cat.Category == order.OrderCategory).Duration;
+
+                    int duration;
+                    if (order.OrderCategory == "Loading time")
+                        duration = GetLoadingTimeBySeverity(matching.LevelOfSevernity);
+                    else
+                        duration = Categories.First(cat => cat.Category == order.OrderCategory).Duration;
+
                     int height = duration;
                     await SendMiroShapeAsync(content, x, y, fillColor, height);
-
                 }
             }
 
@@ -426,44 +598,57 @@ public class CreatorReadyLocation
 
             planner.OrdersMovedFromTheStationList.Clear();
 
-            string authorNote = $"{Author} {Contact} {Version}";
+            string authorNote = $"{Author} {Contact} {Version} {TotalTries}{matching.TotalTries} {LevelOfSevernity2}{matching.LevelOfSevernity}";
             await SendMiroShapeAsync(
                 authorNote,
                 -240, 
                 0,
                 "#FFFFFF",
-                320
+                380
             );
-
-            // Testing input section
-            Console.WriteLine($"{FormerenStationAmmount}, {ReadyLocationAmmount},{OrderSlotAmmount} ");
-            foreach (var category in Categories)
-            {
-                Console.WriteLine($"{category.Category}: {category.Count}");
+                success = true;
             }
-            foreach (var station in formerenStations)
-            {
-                Console.WriteLine($"FormerenStationID: {station.FormerenStationID}, TimeAvailableFormeren: {station.TimeAvailableFormeren}");
-            }
-            foreach (var location in readyLocation)
-            {
-                Console.WriteLine($"ReadylocationID: {location.ReadyLocationID}, TimeAvailableReady: {location.TimeAvailableReady}");
-            }
-            Console.ReadLine();
-
-        }
         catch (InvalidOperationException ex)
         {
             {
                 Console.WriteLine("Error: " + ex.Message);
-                Console.ReadLine();
-            }
-
+                matching.IncrementTries();
+                Console.WriteLine($"Total tries: {matching.TotalTries}");
+                planner.OrdersMovedFromTheStationList.Clear();
+                    if (tries >= 100)
+                        {
+                        matching.UpdateSevernity(2);
+                        Console.WriteLine("Severity level increased to 2 due to 100 unsuccessful tries.");
+                    }
+                    if (tries >= 150)
+                    {
+                        matching.UpdateSevernity(3);
+                        Console.WriteLine("Severity level increased to 3 due to 150 unsuccessful tries.");
+                    }
+                    if (tries >= 200)
+                    {
+                        matching.UpdateSevernity(4);
+                        Console.WriteLine("Severity level increased to 4 due to 200 unsuccessful tries.");
+                    }
+                }
+        }
+        }
+        if (!success)
+        {
+            matching.IncrementTries();
+            Console.WriteLine("Failed to plan orders after maximum attempts. Please check your input and try again.");
+            Console.ReadLine();
+        }
+        else
+        {
+            matching.IncrementTries();
+            Console.WriteLine($"Orders have been successfully planned and sent to Miro! Total tries: {matching.TotalTries}");
+            Console.ReadLine();
         }
 
 
-
     }
+
 }
 
 
