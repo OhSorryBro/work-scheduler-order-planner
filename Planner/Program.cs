@@ -10,7 +10,7 @@ class Program
 
     const string Author = "|| Made by: Michal Domagala";
     const string Contact = "  || Visit my LinkedIn profile: https://www.linkedin.com/in/michal-domagala-b0147b236/";
-    const string Version = "|| Version: 1.13";
+    const string Version = "|| Version: 1.14";
 
     public class PlannerLogic
     {
@@ -244,7 +244,7 @@ class Program
         var client = new RestClient(options);
         var request = new RestRequest("");
         request.AddHeader("accept", "application/json");
-        request.AddHeader("authorization", "Bearer eyJtaXJvLm9yaWdpbiI6ImV1MDEifQ_9FnwMHJnrZXzGHHUF2f6cggr4Gk");
+        request.AddHeader("authorization", "Bearer eyJtaXJvLm9yaWdpbiI6ImV1MDEifQ_-jeU2GPz_nkW1FPKzSN2hKS2vcQ");
 
         string body = $"{{\"data\":{{\"content\":\"{content}\",\"shape\":\"rectangle\"}},\"position\":{{\"x\":{x},\"y\":{y}}},\"geometry\":{{\"height\":{height},\"width\":100}},\"style\":{{\"fillColor\":\"{fillColor}\"}}}}";
         request.AddJsonBody(body, false);
@@ -393,6 +393,18 @@ public class CreatorReadyLocation
             }
             Console.WriteLine("All orders have been moved!");
 
+
+            foreach (var order in planner.OrdersMovedFromTheStationList)
+            {
+                await SendMiroShapeAsync(
+                    order.Category,
+                    order.X,
+                    order.Y,
+                    order.Color,
+                    order.End - order.Start
+                );
+            }
+
             foreach (var location in readyLocation)
             {
                 foreach (var order in location.OrdersAdded)
@@ -411,16 +423,7 @@ public class CreatorReadyLocation
 
 
 
-            foreach (var order in planner.OrdersMovedFromTheStationList)
-            {
-                await SendMiroShapeAsync(
-                    order.Category,
-                    order.X,
-                    order.Y,
-                    order.Color,
-                    order.End - order.Start
-                );
-            }
+
             planner.OrdersMovedFromTheStationList.Clear();
 
             string authorNote = $"{Author} {Contact} {Version}";
