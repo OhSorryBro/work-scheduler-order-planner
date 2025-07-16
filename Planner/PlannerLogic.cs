@@ -5,6 +5,7 @@ namespace Planner;
 
 public class PlannerLogic
 {
+    public static List<string> ErrorLogs = new List<string>();
     public static FormerenStation FindStationWithLowestMaxTimeBusy(List<FormerenStation> stations)
     {
         return stations
@@ -101,9 +102,10 @@ public class PlannerLogic
                                             );
             if (!canPlace)
             {
-                throw new InvalidOperationException(
-                $"No available worker slot for category {firstAvailableCategory.Category}, duration {duration} – try again!"
-                );
+                string msg = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] No available worker slot for category {firstAvailableCategory.Category}, duration {duration} – try again!";
+                ErrorLogs.Add(msg);
+                throw new InvalidOperationException(msg);
+                
             }
             // We take order for further processing
             //Console.WriteLine($"Working with category: {firstAvailableCategory.Category}, We still have: {firstAvailableCategory.Count - 1}");
@@ -220,7 +222,9 @@ public class PlannerLogic
         }
         if (ready == null)
         {
-            throw new InvalidOperationException("No empty place for this slot!");
+            string msg = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} No empty place for this slot!";
+            ErrorLogs.Add(msg);
+            throw new InvalidOperationException(msg);
         }
 
 
@@ -255,8 +259,9 @@ public class PlannerLogic
         }
         else
         {
-            throw new InvalidOperationException(
-                $"Loading slots exceed maxParallel={maxSimultaneousLoading} for time {loadingStart}-{loadingEnd}");
+            string msg = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Loading slots exceed maxParallel={maxSimultaneousLoading} for time {loadingStart}-{loadingEnd}";
+            ErrorLogs.Add(msg);
+            throw new InvalidOperationException(msg);
         }
     }
 
