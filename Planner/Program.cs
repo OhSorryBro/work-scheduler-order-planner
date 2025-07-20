@@ -1,12 +1,13 @@
-﻿using RestSharp;
+﻿using Microsoft.Extensions.Configuration;
+using Planner;
+using RestSharp;
 using System.Globalization;
+using System.IO;
 using System.Linq.Expressions;
 using System.Reflection.Emit;
 using System.Reflection.PortableExecutable;
 using System.Threading.Tasks;
-using Planner;
-using System.IO;
-using Microsoft.Extensions.Configuration;
+using static Planner.PlannerLogic;
 
 namespace Planner;
 
@@ -16,7 +17,7 @@ class Program
 
     const string Author = "|| Made by: Michal Domagala";
     const string Contact = "  || Visit my LinkedIn profile: https://www.linkedin.com/in/michal-domagala-b0147b236/";
-    const string Version = "|| Version: 1.17";
+    const string Version = "|| Version: 1.18";
     const string TotalTries = $"|| Total tries: ";
     const string LevelOfSevernity2 = "|| Level of Severnity: ";
 
@@ -136,34 +137,48 @@ class Program
         int OrderSlotAmmount = 0;
         List<CategoryCount> Categories = new List<CategoryCount>
         {
-            new CategoryCount{ Category = "VE(A)",      Duration=60 ,   Count =0, DurationGroup= 1, Color = "#f5f6f8"},
-            new CategoryCount{ Category = "VE(B)",      Duration=90 ,   Count =0, DurationGroup= 1, Color = "#d5f692"},
-            new CategoryCount{ Category = "E(A)",       Duration=120 ,  Count =0, DurationGroup= 2, Color = "#d0e17a"},
-            new CategoryCount{ Category = "E(B)",       Duration=150 ,  Count =0, DurationGroup= 2, Color = "#93d275"},
-            new CategoryCount{ Category = "M(A)",       Duration=180 ,  Count =0, DurationGroup= 2, Color = "#67c6c0"},
-            new CategoryCount{ Category = "M(B)",       Duration=210 ,  Count =0, DurationGroup= 2, Color = "#23bfe7"},
-            new CategoryCount{ Category = "D(A)",       Duration=240 ,  Count =0, DurationGroup= 2, Color = "#a6ccf5"},
-            new CategoryCount{ Category = "D(B)",       Duration=270 ,  Count =0, DurationGroup= 3, Color = "#7b92ff"},
-            new CategoryCount{ Category = "VD(A)",      Duration=300 ,  Count =0, DurationGroup= 3, Color = "#fff9b1"},
-            new CategoryCount{ Category = "VD(B)",      Duration=330 ,  Count =0, DurationGroup= 3, Color = "#f5d128"},
-            new CategoryCount{ Category = "Container",  Duration=240 ,  Count =0, DurationGroup= 2, Color = "#ff9d48"},
-            new CategoryCount{ Category = "SE",         Duration=270 ,  Count =0, DurationGroup= 3, Color = "#f16c7f"},
-            new CategoryCount{ Category = "BE(A)",      Duration=180 ,  Count =0, DurationGroup= 2, Color = "#ea94bb"},
-            new CategoryCount{ Category = "BE(B)",      Duration=270 ,  Count =0, DurationGroup= 3, Color = "#ffcee0"},
-            new CategoryCount{ Category = "NL",         Duration=270 ,  Count =0, DurationGroup= 3, Color = "#b384bb"},
+            new CategoryCount{ Category = "Order_Type1",      Duration=60 ,   Count =0, DurationGroup= 1, Color = "#f5f6f8"},
+            new CategoryCount{ Category = "Order_Type2",      Duration=90 ,   Count =0, DurationGroup= 1, Color = "#d5f692"},
+            new CategoryCount{ Category = "Order_Type3",      Duration=120 ,  Count =0, DurationGroup= 2, Color = "#d0e17a"},
+            new CategoryCount{ Category = "Order_Type4",      Duration=150 ,  Count =0, DurationGroup= 2, Color = "#93d275"},
+            new CategoryCount{ Category = "Order_Type5",      Duration=180 ,  Count =0, DurationGroup= 2, Color = "#67c6c0"},
+            new CategoryCount{ Category = "Order_Type6",      Duration=210 ,  Count =0, DurationGroup= 2, Color = "#23bfe7"},
+            new CategoryCount{ Category = "Order_Type7",      Duration=240 ,  Count =0, DurationGroup= 2, Color = "#a6ccf5"},
+            new CategoryCount{ Category = "Order_Type8",      Duration=270 ,  Count =0, DurationGroup= 3, Color = "#7b92ff"},
+            new CategoryCount{ Category = "Order_Type9",      Duration=300 ,  Count =0, DurationGroup= 3, Color = "#fff9b1"},
+            new CategoryCount{ Category = "Order_Type10",     Duration=330 ,  Count =0, DurationGroup= 3, Color = "#f5d128"},
+            new CategoryCount{ Category = "Order_Type11",     Duration=240 ,  Count =0, DurationGroup= 2, Color = "#ff9d48"},
+            new CategoryCount{ Category = "Order_Type12",     Duration=270 ,  Count =0, DurationGroup= 3, Color = "#f16c7f"},
+            new CategoryCount{ Category = "Order_Type13",     Duration=180 ,  Count =0, DurationGroup= 2, Color = "#ea94bb"},
+            //new CategoryCount{ Category = "VE(A)",      Duration=60 ,   Count =0, DurationGroup= 1, Color = "#f5f6f8"},
+            //new CategoryCount{ Category = "VE(B)",      Duration=90 ,   Count =0, DurationGroup= 1, Color = "#d5f692"},
+            //new CategoryCount{ Category = "E(A)",       Duration=120 ,  Count =0, DurationGroup= 2, Color = "#d0e17a"},
+            //new CategoryCount{ Category = "E(B)",       Duration=150 ,  Count =0, DurationGroup= 2, Color = "#93d275"},
+            //new CategoryCount{ Category = "M(A)",       Duration=180 ,  Count =0, DurationGroup= 2, Color = "#67c6c0"},
+            //new CategoryCount{ Category = "M(B)",       Duration=210 ,  Count =0, DurationGroup= 2, Color = "#23bfe7"},
+            //new CategoryCount{ Category = "D(A)",       Duration=240 ,  Count =0, DurationGroup= 2, Color = "#a6ccf5"},
+            //new CategoryCount{ Category = "D(B)",       Duration=270 ,  Count =0, DurationGroup= 3, Color = "#7b92ff"},
+            //new CategoryCount{ Category = "VD(A)",      Duration=300 ,  Count =0, DurationGroup= 3, Color = "#fff9b1"},
+            //new CategoryCount{ Category = "VD(B)",      Duration=330 ,  Count =0, DurationGroup= 3, Color = "#f5d128"},
+            //new CategoryCount{ Category = "Container",  Duration=240 ,  Count =0, DurationGroup= 2, Color = "#ff9d48"},
+            //new CategoryCount{ Category = "SE",         Duration=270 ,  Count =0, DurationGroup= 3, Color = "#f16c7f"},
+            //new CategoryCount{ Category = "BE(A)",      Duration=180 ,  Count =0, DurationGroup= 2, Color = "#ea94bb"},
+            //new CategoryCount{ Category = "BE(B)",      Duration=270 ,  Count =0, DurationGroup= 3, Color = "#ffcee0"},
+            //new CategoryCount{ Category = "NL",         Duration=270 ,  Count =0, DurationGroup= 3, Color = "#b384bb"},
          };
 
 
         // Welcome message and input section
         Console.WriteLine("Welcome to the Planner application!");
-        Console.WriteLine("This application is designed to help you plan your work-load effectively at the Heijen department.");
+        Console.WriteLine("This application is designed to help you plan your work-load effectively at the XXXXXXX department.");
         Console.WriteLine("It will assist you in determining the best order slots based on the available time at the Formeren station and Ready locations.");
 
 
         int FormerenStationAmmount = ReadIntFromConsole("Please type in amount of Formeren stations available:");
         int ReadyLocationAmmount = ReadIntFromConsole("Please type in amount of Ready locations available:");
         int scenario = ReadIntFromConsoleScenario("Choose the scenario (1, 2, 3):");
-
+        Console.WriteLine("Choose the location: H (xxxxx) or K (xxxxxxxxxxx)");
+        string layoutInput = Console.ReadLine()?.ToUpper();
 
         Random rng = new Random();
         foreach (var category in Categories)
@@ -206,12 +221,14 @@ class Program
         var OriginalFormerenStations = CreatorFormerenStation.CreatorFormerenStations(FormerenStationAmmount);
         var OriginalReadyLocation = CreatorReadyLocation.CreatorReadyLocations(ReadyLocationAmmount);
 
+
         while (!success && tries < maxTries)
         {
             tries++;
             var tmpCategories = DeepCopyCategories(OriginalCategories);
             var tmpFormerenStations = DeepCopyFormerenStations(OriginalFormerenStations);
             var tmpReadyLocation = DeepCopyReadyLocations(OriginalReadyLocation);
+            var dockAssignments = AssignDocks(tmpFormerenStations.Count, layoutInput);
 
             switch (matching.LevelOfSevernity)
             {
@@ -231,6 +248,7 @@ class Program
             }
             // We prepare clean data for the planner
 
+
             try
             {
             planner.CheckIfEnoughTimeAvailable(tmpFormerenStations, tmpCategories);
@@ -242,7 +260,7 @@ class Program
 
             while (!tmpFormerenStations.All(station => station.OrdersAdded.Count == 0))
             {
-                    PlannerLogic.TransferOrdersToReadyLocations(tmpFormerenStations, tmpReadyLocation, tmpCategories, matching.LevelOfSevernity, MaxSimultaneousLoading);
+                    PlannerLogic.TransferOrdersToReadyLocations(tmpFormerenStations, tmpReadyLocation, tmpCategories, matching.LevelOfSevernity, MaxSimultaneousLoading, dockAssignments);
             }
             Console.WriteLine("All orders have been moved!");
 

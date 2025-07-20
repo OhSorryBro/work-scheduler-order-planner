@@ -1,11 +1,76 @@
-﻿using System;
-using Planner;
+﻿using Planner;
+using System;
+using static Planner.PlannerLogic;
 
 namespace Planner;
 
 public class PlannerLogic
 {
     public static List<string> ErrorLogs = new List<string>();
+
+    public class DockAssignment
+    {
+        public int DockId { get; set; }
+        public int FormerenStationId { get; set; }
+    }
+
+    public static List<DockAssignment> AssignDocks(int numberOfFormerenStations, string layoutType)
+    {
+        var dockAssignments = new List<DockAssignment>();
+
+        Dictionary<int, List<(int startDock, int endDock)>> mapping;
+
+        // Obsługa układów: H (standard), K (alternatywny)
+        if (layoutType.ToUpper() == "H")
+        {
+            mapping = new Dictionary<int, List<(int, int)>>()
+        {
+            { 1, new List<(int, int)> { (1, 13) } },
+            { 2, new List<(int, int)> { (1, 6), (7, 13) } },
+            { 3, new List<(int, int)> { (1, 3), (4, 8), (9, 13) } },
+            { 4, new List<(int, int)> { (1, 2), (3, 5), (6, 8), (9, 13) } },
+            { 5, new List<(int, int)> { (1, 2), (3, 4), (5, 6), (7, 9), (10, 12) } },
+        };
+        }
+        else if (layoutType.ToUpper() == "K")
+        {
+            if (numberOfFormerenStations > 4)
+                throw new ArgumentException("Layout K supports max 4 FormerenStations");
+
+            mapping = new Dictionary<int, List<(int, int)>>()
+        {
+            { 1, new List<(int, int)> { (1, 8) } },
+            { 2, new List<(int, int)> { (1, 4), (5, 8) } },
+            { 3, new List<(int, int)> { (1, 2), (3, 5), (6, 8) } },
+            { 4, new List<(int, int)> { (1, 2), (3, 4), (5, 6), (7, 8) } },
+        };
+        }
+        else
+        {
+            throw new ArgumentException("Unknown layout type. Use 'H' or 'K'.");
+        }
+
+        if (!mapping.ContainsKey(numberOfFormerenStations))
+            throw new ArgumentException($"Unsupported number of FormerenStations for layout {layoutType}");
+
+        var ranges = mapping[numberOfFormerenStations];
+
+        for (int i = 0; i < ranges.Count; i++)
+        {
+            var (start, end) = ranges[i];
+            for (int dock = start; dock <= end; dock++)
+            {
+                dockAssignments.Add(new DockAssignment
+                {
+                    DockId = dock,
+                    FormerenStationId = i + 1 // ID1, ID2, ...
+                });
+            }
+        }
+
+        return dockAssignments;
+    }
+
     public static FormerenStation FindStationWithLowestMaxTimeBusy(List<FormerenStation> stations)
     {
         return stations
@@ -196,7 +261,7 @@ public class PlannerLogic
         }
         return true;
     }
-    public static void TransferOrdersToReadyLocations(List<FormerenStation> formerenStations, List<ReadyLocation> readyLocations, List<CategoryCount> categories, int levelOfSevernity, int maxSimultaneousLoading)
+    public static void TransferOrdersToReadyLocations(List<FormerenStation> formerenStations, List<ReadyLocation> readyLocations, List<CategoryCount> categories, int levelOfSevernity, int maxSimultaneousLoading, List<DockAssignment> dockAssignments)
     {
         var station = formerenStations.FirstOrDefault(s => s.OrdersAdded.Count > 0);
         if (station == null) return;
@@ -210,8 +275,16 @@ public class PlannerLogic
         int loadingEnd = loadingStart + loadingDuration - 1;
 
         ReadyLocation ready = null;
+        // FILTRUJEMY docki przypisane do danego stanowiska
+        var dockIdsForThisStation = dockAssignments
+            .Where(d => d.FormerenStationId == station.FormerenStationID)
+            .Select(d => d.DockId)
+            .ToHashSet();
 
-        foreach (var loc in readyLocations.OrderBy(_ => Guid.NewGuid()))
+
+        foreach (var loc in readyLocations
+                    .Where(r => dockIdsForThisStation.Contains(r.ReadyLocationID))
+                    .OrderBy(_ => Guid.NewGuid()))
         {
             // Tu sprawdzamy cały zakres: orderStart ... loadingEnd
             if (IsSlotAvailable(loc.TimeBusy, orderStart, loadingEnd))
