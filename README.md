@@ -1,40 +1,98 @@
-WorkSchedulerOrderPlanner
-Console application for optimal scheduling of “Formeren” stations and “Ready” locations in the Heijen department.
+# MIRO Order Planner (C#)
 
-Project Description
-WorkSchedulerOrderPlanner is a C# console application designed to model and optimize the order preparation workflow in the Heijen department. The process consists of two main phases:
-Formeren (Preparation): Collect and assemble materials into ready-for-zone orders. Each Formeren station represents a preparation zone with a fixed available time (e.g., 1440 minutes per day).
-Ready Location (Awaiting Pickup): After processing, orders are moved to designated Ready locations where they wait for pickup, each with its own time capacity.
+**Author:** Michał Domagała  
+**Version:** 1.18  
+**Status:** [ON HOLD]  
+**Tech stack:** C#, .NET, RestSharp, Microsoft.Extensions.Configuration
 
-The application:
-Prompts the user for the number of Formeren stations and Ready locations.
-Collects the quantity of order slots per category (operation-specific and customizable as needed)
-Generates lists of station and location objects with their available time in minutes.
+---
 
-Requirements
+## Project Description
 
-.NET Framework 4.8 (or higher) or .NET 6.0+ (if ported)
-Visual Studio 2019/2022 or any C# IDE
+A C# application for automatic planning and allocation of order slots to workstations and ready locations, with live visualization on a [MIRO](https://miro.com/) board via API.
 
-Configuration and Run
-Run the console application directly—no external configuration files are required; all settings are defined in the source code.
-cd src/Planner.ConsoleApp
-dotnet run --configuration Release
-Follow the console prompts to enter the number of stations, locations, and order slots per category.
+The project was built for a real-world logistics use case: optimizing and reporting order preparation and handover processes in a warehouse environment.
 
-Example Usage
-After running the app:
+---
 
-Welcome to WorkSchedulerOrderPlanner!
-Please enter the number of Formeren stations available: 3
-Please enter the number of Ready locations available: 2
-Please enter the number of order slots for VE(A): 5
-...
-The app will then display the generated station and location objects and (in the future) export the plan to a file.
+## What does the application do?
 
+- **Takes input parameters:** number of workstations (Formeren Stations), ready locations, order types/quantities, and scenario selection.
+- **Automatically plans** the allocation of orders to stations, considering time constraints, order types, potential slot conflicts, severity levels, and slot availability.
+- **Integrates with MIRO:** draws shapes on a MIRO board to represent tasks/orders, including colors and positions (via REST API).
+- **Reporting:** generates error logs and CSV summary files (errors, order counts, etc.).
+- **Code tampering protection:** simple anti-manipulation logic to detect unauthorized changes.
 
-Contributing
-Fork the repository.
-Create a feature branch: feature/your-feature-name.
-Implement your changes and add tests.
-Submit a pull request.
+---
+
+## Key Features
+
+- Modular architecture (separate classes for stations, locations, orders, and core planning logic)
+- Exception handling & multi-attempt planning in case of allocation errors
+- Deep copy of planning structures (safe simulation of different layouts/scenarios)
+- Async HTTP requests to the MIRO API
+- CSV report export
+- Easy to extend (add new order types, planning rules, locations, etc.)
+
+---
+
+## How to Run
+
+1. Clone the repository:
+2. Add your MIRO API key to the `appsettings.json` file:
+    ```json
+    {
+      "Miro": {
+        "ApiKey": "your_api_key_here"
+      }
+    }
+    ```
+3. Run the application:
+    - Visual Studio/VS Code: F5 or `dotnet run`
+    - Command line:  
+      ```
+      dotnet run
+      ```
+4. Follow the console instructions to enter input parameters.
+Watch out! Some settings are set-up in code.
+---
+
+## Requirements
+
+- .NET 7.0 or higher
+- RestSharp
+- Microsoft.Extensions.Configuration
+
+---
+
+## Example Workflow
+
+1. User enters the number of stations and locations, and selects a scenario.
+2. Inputs the number of orders per type.
+3. The system automatically plans the allocation.
+4. Results are drawn on the MIRO board (each order as a separate shape).
+5. Logs and reports are saved as CSV files.
+
+---
+
+## Example screenshot
+
+<img width="3328" height="1382" alt="image" src="https://github.com/user-attachments/assets/80c2d178-228e-437c-980a-dd7c915ba038" />
+
+---
+
+## Roadmap
+
+**Project is currently on hold (paused to focus on Data Analysis & BI career path).**  
+Future development may continue after gaining further experience in Python, BI, and analytics.
+
+---
+
+## Contact
+
+Michał Domagała  
+[LinkedIn](https://www.linkedin.com/in/michal-domagala-b0147b236/)
+
+---
+
+*If you’d like to use this project or have questions, feel free to reach out via LinkedIn.*
