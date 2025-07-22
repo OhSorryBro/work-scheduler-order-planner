@@ -295,8 +295,7 @@ public class PlannerLogic
         }
         if (ready == null)
         {
-            string msg = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} No empty place for this slot!";
-            ErrorLogs.Add(msg);
+            string msg = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} No empty place! Tried to place at minute {orderStart}-{loadingEnd} on any of: {string.Join(",", dockIdsForThisStation)}";
             throw new InvalidOperationException(msg);
         }
 

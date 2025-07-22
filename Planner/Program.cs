@@ -201,6 +201,9 @@ class Program
         var formerenStations = CreatorFormerenStation.CreatorFormerenStations(FormerenStationAmmount);
         var readyLocation = CreatorReadyLocation.CreatorReadyLocations(ReadyLocationAmmount);
         var matching = new LevelOfMatching(scenario);
+        var readyStatus = FileHelpers.ReadReadyLocationStatus("ready_locations_status.csv");
+
+
 
         // PLANNER SETTINGS
         bool success = false;
@@ -220,6 +223,16 @@ class Program
         var OriginalCategories = DeepCopyCategories(Categories);
         var OriginalFormerenStations = CreatorFormerenStation.CreatorFormerenStations(FormerenStationAmmount);
         var OriginalReadyLocation = CreatorReadyLocation.CreatorReadyLocations(ReadyLocationAmmount);
+        foreach (var location in OriginalReadyLocation)
+        {
+            if (readyStatus.TryGetValue(location.ReadyLocationID, out int occupiedUntil))
+            {
+                for (int i = 0; i < occupiedUntil; i++)
+                {
+                    location.TimeBusy.Add(i);
+                }
+            }
+        }
 
 
         while (!success && tries < maxTries)
