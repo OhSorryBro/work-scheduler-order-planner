@@ -20,7 +20,7 @@ public class PlannerLogic
 
         Dictionary<int, List<(int startDock, int endDock)>> mapping;
 
-        // Obsługa układów: H (standard), K (alternatywny)
+
         if (layoutType.ToUpper() == "H")
         {
             mapping = new Dictionary<int, List<(int, int)>>()
@@ -39,9 +39,9 @@ public class PlannerLogic
 
             mapping = new Dictionary<int, List<(int, int)>>()
         {
-            { 1, new List<(int, int)> { (1, 8) } },
-            { 2, new List<(int, int)> { (1, 4), (5, 8) } },
-            { 3, new List<(int, int)> { (1, 2), (3, 5), (6, 8) } },
+            { 1, new List<(int, int)> { (2, 8) } },
+            { 2, new List<(int, int)> { (2, 5), (5, 8) } },
+            { 3, new List<(int, int)> { (2, 3), (4, 6), (7, 8) } },
             { 4, new List<(int, int)> { (1, 2), (3, 4), (5, 6), (7, 8) } },
         };
         }
