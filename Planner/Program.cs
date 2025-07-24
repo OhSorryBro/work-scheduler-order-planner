@@ -103,6 +103,22 @@ class Program
             }
         }
     }
+    public static string ReadDepartmentFromConsole(string prompt)
+    {
+        while (true)
+        {
+            Console.WriteLine(prompt);
+            string input = Console.ReadLine()?.Trim().ToUpper();
+            if (input == "H" || input == "K")
+            {
+                return input; // Zwraca "H" lub "K"
+            }
+            else
+            {
+                Console.WriteLine("Please type in a valid department: H or K.");
+            }
+        }
+    }
 
     public static async Task SendMiroShapeAsync(string content, int x, int y, string fillColor, int height, string apiKey)
     {
@@ -177,8 +193,7 @@ class Program
         int FormerenStationAmmount = ReadIntFromConsole("Please type in amount of Formeren stations available:");
         int ReadyLocationAmmount = ReadIntFromConsole("Please type in amount of Ready locations available:");
         int scenario = ReadIntFromConsoleScenario("Choose the scenario (1, 2, 3):");
-        Console.WriteLine("Choose the location: H (xxxxx) or K (xxxxxxxxxxx)");
-        string layoutInput = Console.ReadLine()?.ToUpper();
+        string layoutInput = ReadDepartmentFromConsole("Choose the location: H(xxxxx) or K(xxxxxxxxxxx)");
 
         Random rng = new Random();
         foreach (var category in Categories)
@@ -209,7 +224,11 @@ class Program
         bool success = false;
         int maxTries = 5000;
         int tries = 0;
-        int baseMaxSimultaneousLoading = 4;
+        int baseMaxSimultaneousLoading;
+        if (layoutInput == "H" )
+        { baseMaxSimultaneousLoading = 4; }
+        else
+        { baseMaxSimultaneousLoading = 3; }
         int MaxSimultaneousLoading;
 
 
